@@ -31,7 +31,12 @@ import io.airbyte.workers.temporal.sync.SyncWorkflow;
 import io.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsRequest;
 import io.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse;
 import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowClientOptions;
+import io.temporal.serviceclient.SimpleSslContextBuilder;
 import io.temporal.serviceclient.WorkflowServiceStubs;
+import io.temporal.serviceclient.WorkflowServiceStubsOptions;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Optional;
@@ -66,16 +71,25 @@ public class TemporalClient {
   private static final int MAXIMUM_SEARCH_PAGE_SIZE = 50;
 
   public static TemporalClient production(final String temporalHost, final Path workspaceRoot, final Configs configs) {
-    final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalService(temporalHost);
-    return new TemporalClient(WorkflowClient.newInstance(temporalService), workspaceRoot, temporalService, configs);
+    // TODO for now, return just the cloud client
+//    final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalService(temporalHost);
+//    return new TemporalClient(WorkflowClient.newInstance(temporalService), workspaceRoot, temporalService, configs);
+
+    log.info("PARKER: returning cloud client");
+    return cloudClient(workspaceRoot, configs);
+  }
+
+  public static TemporalClient cloudClient(final Path workspaceRoot, final Configs configs) {
+    final WorkflowServiceStubs temporalCloudService = TemporalUtils.createTemporalCloudService();
+    return new TemporalClient(WorkflowClient.newInstance(temporalCloudService), workspaceRoot, temporalCloudService, configs);
   }
 
   // todo (cgardens) - there are two sources of truth on workspace root. we need to get this down to
   // one. either temporal decides and can report it or it is injected into temporal runs.
   public TemporalClient(final WorkflowClient client,
-                        final Path workspaceRoot,
-                        final WorkflowServiceStubs workflowServiceStubs,
-                        final Configs configs) {
+      final Path workspaceRoot,
+      final WorkflowServiceStubs workflowServiceStubs,
+      final Configs configs) {
     this.client = client;
     this.workspaceRoot = workspaceRoot;
     this.service = workflowServiceStubs;

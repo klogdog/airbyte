@@ -20,12 +20,18 @@ import io.temporal.api.workflowservice.v1.ListNamespacesRequest;
 import io.temporal.api.workflowservice.v1.UpdateNamespaceRequest;
 import io.temporal.client.ActivityCompletionException;
 import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowClientOptions;
 import io.temporal.client.WorkflowOptions;
 import io.temporal.client.WorkflowStub;
 import io.temporal.common.RetryOptions;
+import io.temporal.serviceclient.SimpleSslContextBuilder;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
+import io.temporal.worker.WorkerFactory;
 import io.temporal.workflow.Functions;
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.time.Duration;
 import java.util.Set;
@@ -37,6 +43,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import javax.net.ssl.SSLException;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.slf4j.Logger;
@@ -48,6 +55,27 @@ public class TemporalUtils {
 
   public static final Duration SEND_HEARTBEAT_INTERVAL = Duration.ofSeconds(10);
   public static final Duration HEARTBEAT_TIMEOUT = Duration.ofSeconds(30);
+
+  public static WorkflowServiceStubs createTemporalCloudService() {
+    try {
+      final InputStream clientCert = new FileInputStream(configs.getTemporalCloudClientCert());
+      final InputStream clientKey = new FileInputStream(configs.getTemporalCloudClientKey());
+      final String targetEndpoint = configs.getTemporalCloudHost();
+
+      final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
+          .setSslContext(SimpleSslContextBuilder.forPKCS8(clientCert, clientKey).build())
+          .setTarget(targetEndpoint)
+          .build();
+
+      return getTemporalClientWhenConnected(
+          Duration.ofSeconds(2),
+          Duration.ofMinutes(2),
+          Duration.ofSeconds(5),
+          () -> WorkflowServiceStubs.newInstance(options));
+    } catch (final Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   public static WorkflowServiceStubs createTemporalService(final String temporalHost) {
     final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()

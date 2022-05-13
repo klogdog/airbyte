@@ -80,6 +80,10 @@ public class EnvConfigs implements Configs {
   private static final String TEMPORAL_HOST = "TEMPORAL_HOST";
   private static final String TEMPORAL_WORKER_PORTS = "TEMPORAL_WORKER_PORTS";
   private static final String TEMPORAL_HISTORY_RETENTION_IN_DAYS = "TEMPORAL_HISTORY_RETENTION_IN_DAYS";
+  private static final String TEMPORAL_CLOUD_HOST = "TEMPORAL_CLOUD_HOST";
+  private static final String TEMPORAL_CLOUD_NAMESPACE = "TEMPORAL_CLOUD_NAMESPACE";
+  private static final String TEMPORAL_CLOUD_CLIENT_CERT = "TEMPORAL_CLOUD_CLIENT_CERT";
+  private static final String TEMPORAL_CLOUD_CLIENT_KEY = "TEMPORAL_CLOUD_CLIENT_KEY";
   public static final String JOB_KUBE_NAMESPACE = "JOB_KUBE_NAMESPACE";
   private static final String SUBMITTER_NUM_THREADS = "SUBMITTER_NUM_THREADS";
   public static final String JOB_MAIN_CONTAINER_CPU_REQUEST = "JOB_MAIN_CONTAINER_CPU_REQUEST";
@@ -389,6 +393,27 @@ public class EnvConfigs implements Configs {
   @Override
   public boolean runDatabaseMigrationOnStartup() {
     return getEnvOrDefault(RUN_DATABASE_MIGRATION_ON_STARTUP, true);
+  }
+
+  // Temporal Cloud
+  @Override
+  public String getTemporalCloudHost() {
+    return getEnvOrDefault(TEMPORAL_CLOUD_HOST, "dev.ebc2e.tmprl.cloud:7233");
+  }
+
+  @Override
+  public String getTemporalCloudNamespace() {
+    return getEnvOrDefault(TEMPORAL_CLOUD_NAMESPACE, "dev.ebc2e");
+  }
+
+  @Override
+  public String getTemporalCloudClientCert() {
+    return getEnsureEnv(TEMPORAL_CLOUD_CLIENT_CERT);
+  }
+
+  @Override
+  public String getTemporalCloudClientKey() {
+    return getEnsureEnv(TEMPORAL_CLOUD_CLIENT_KEY);
   }
 
   // Airbyte Services
