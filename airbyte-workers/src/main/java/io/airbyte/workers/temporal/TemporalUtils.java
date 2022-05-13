@@ -27,9 +27,11 @@ import io.temporal.serviceclient.SimpleSslContextBuilder;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
 import io.temporal.workflow.Functions;
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
@@ -54,8 +56,8 @@ public class TemporalUtils {
 
   public static WorkflowServiceStubs createTemporalCloudService() {
     try {
-      final InputStream clientCert = new FileInputStream(configs.getTemporalCloudClientCert());
-      final InputStream clientKey = new FileInputStream(configs.getTemporalCloudClientKey());
+      final InputStream clientCert = new ByteArrayInputStream(configs.getTemporalCloudClientCert().getBytes(StandardCharsets.UTF_8));
+      final InputStream clientKey = new ByteArrayInputStream(configs.getTemporalCloudClientKey().getBytes(StandardCharsets.UTF_8));
       final String targetEndpoint = configs.getTemporalCloudHost();
 
       final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
