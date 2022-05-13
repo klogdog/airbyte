@@ -161,7 +161,8 @@ public interface Configs {
   String getConfigsDatabaseMinimumFlywayMigrationVersion();
 
   /**
-   * Define the total time to wait for the Configs Database to be initialized. This includes migrations.
+   * Define the total time to wait for the Configs Database to be initialized. This includes
+   * migrations.
    */
   long getConfigsDatabaseInitializationTimeoutMs();
 
@@ -170,7 +171,7 @@ public interface Configs {
    */
   boolean runDatabaseMigrationOnStartup();
 
-  //Temporal Cloud
+  // Temporal Cloud
 
   /**
    * Temporal Cloud target endpoint, usually with form ${namespace}.tmprl.cloud:7233
@@ -197,7 +198,8 @@ public interface Configs {
   // Airbyte Services
 
   /**
-   * Define the url where Temporal is hosted at. Please include the port. Airbyte services use this information.
+   * Define the url where Temporal is hosted at. Please include the port. Airbyte services use this
+   * information.
    */
   String getTemporalHost();
 
