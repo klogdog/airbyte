@@ -81,16 +81,16 @@ public class TemporalUtils {
   public static WorkflowServiceStubs createTemporalService(final String temporalHost) {
     return createTemporalCloudService();
 
-//    LOGGER.info("PARKER: called createTemporalService (unexpected)");
-//    final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
-//        .setTarget(temporalHost) // todo: move to EnvConfigs
-//        .build();
-//
-//    return getTemporalClientWhenConnected(
-//        Duration.ofSeconds(2),
-//        Duration.ofMinutes(2),
-//        Duration.ofSeconds(5),
-//        () -> WorkflowServiceStubs.newInstance(options));
+    // LOGGER.info("PARKER: called createTemporalService (unexpected)");
+    // final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
+    // .setTarget(temporalHost) // todo: move to EnvConfigs
+    // .build();
+    //
+    // return getTemporalClientWhenConnected(
+    // Duration.ofSeconds(2),
+    // Duration.ofMinutes(2),
+    // Duration.ofSeconds(5),
+    // () -> WorkflowServiceStubs.newInstance(options));
   }
 
   public static final RetryOptions NO_RETRY = RetryOptions.newBuilder().setMaximumAttempts(1).build();
