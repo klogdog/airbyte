@@ -47,9 +47,13 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.StopWatch;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Slf4j
 public class TemporalClient {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(TemporalClient.class);
 
   private final Path workspaceRoot;
   private final WorkflowClient client;
@@ -70,12 +74,13 @@ public class TemporalClient {
     // final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalService(temporalHost);
     // return new TemporalClient(WorkflowClient.newInstance(temporalService), workspaceRoot,
     // temporalService, configs);
-
-    log.info("PARKER: returning cloud client");
+    LOGGER.info("PARKER: called TemporalClient production");
+    LOGGER.info("PARKER: returning cloud client");
     return cloudClient(workspaceRoot, configs);
   }
 
   public static TemporalClient cloudClient(final Path workspaceRoot, final Configs configs) {
+    LOGGER.info("PARKER: called TemporalClient cloudClient");
     final WorkflowServiceStubs temporalCloudService = TemporalUtils.createTemporalCloudService();
     return new TemporalClient(WorkflowClient.newInstance(temporalCloudService), workspaceRoot, temporalCloudService, configs);
   }

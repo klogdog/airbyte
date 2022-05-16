@@ -54,6 +54,7 @@ public class TemporalUtils {
   public static final Duration HEARTBEAT_TIMEOUT = Duration.ofSeconds(30);
 
   public static WorkflowServiceStubs createTemporalCloudService() {
+    LOGGER.info("PARKER: called createTemporalCloudService");
     try {
       final InputStream clientCert = new ByteArrayInputStream(configs.getTemporalCloudClientCert().getBytes(StandardCharsets.UTF_8));
       final InputStream clientKey = new ByteArrayInputStream(configs.getTemporalCloudClientKey().getBytes(StandardCharsets.UTF_8));
@@ -78,6 +79,7 @@ public class TemporalUtils {
   }
 
   public static WorkflowServiceStubs createTemporalService(final String temporalHost) {
+    LOGGER.info("PARKER: called createTemporalService (unexpected)");
     final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
         .setTarget(temporalHost) // todo: move to EnvConfigs
         .build();

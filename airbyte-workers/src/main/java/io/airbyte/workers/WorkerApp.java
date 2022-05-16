@@ -408,6 +408,7 @@ public class WorkerApp {
         configRepository,
         new OAuthConfigSupplier(configRepository, trackingClient));
 
+    LOGGER.info("PARKER: about to call TemporalClient production from WorkerApp launchWorkerApp");
     final TemporalClient temporalClient = TemporalClient.production(temporalHost, workspaceRoot, configs);
 
     final TemporalWorkerRunFactory temporalWorkerRunFactory = new TemporalWorkerRunFactory(
