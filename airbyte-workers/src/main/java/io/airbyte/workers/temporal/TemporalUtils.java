@@ -60,6 +60,9 @@ public class TemporalUtils {
       final InputStream clientKey = new ByteArrayInputStream(configs.getTemporalCloudClientKey().getBytes(StandardCharsets.UTF_8));
       final String targetEndpoint = configs.getTemporalCloudHost();
 
+      LOGGER.info("PARKER: using client cert {}", configs.getTemporalCloudClientCert().getBytes(StandardCharsets.UTF_8));
+      LOGGER.info("PARKER: using client key with length {}", configs.getTemporalCloudClientKey().getBytes(StandardCharsets.UTF_8).length);
+
       final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
           .setSslContext(SimpleSslContextBuilder.forPKCS8(clientCert, clientKey).build())
           .setTarget(targetEndpoint)
@@ -95,27 +98,28 @@ public class TemporalUtils {
       .setInitialInterval(Duration.ofSeconds(configs.getDelayBetweenActivityAttempts()))
       .build();
 
-  public static final String DEFAULT_NAMESPACE = "default";
+//  public static final String DEFAULT_NAMESPACE = "default";
 
   private static final Duration WORKFLOW_EXECUTION_TTL = Duration.ofDays(configs.getTemporalRetentionInDays());
   private static final String HUMAN_READABLE_WORKFLOW_EXECUTION_TTL =
       DurationFormatUtils.formatDurationWords(WORKFLOW_EXECUTION_TTL.toMillis(), true, true);
 
   public static void configureTemporalNamespace(final WorkflowServiceStubs temporalService) {
+    final var cloudNamespace = configs.getTemporalCloudNamespace();
     final var client = temporalService.blockingStub();
-    final var describeNamespaceRequest = DescribeNamespaceRequest.newBuilder().setNamespace(DEFAULT_NAMESPACE).build();
+    final var describeNamespaceRequest = DescribeNamespaceRequest.newBuilder().setNamespace(cloudNamespace).build();
     final var currentRetentionGrpcDuration = client.describeNamespace(describeNamespaceRequest).getConfig().getWorkflowExecutionRetentionTtl();
     final var currentRetention = Duration.ofSeconds(currentRetentionGrpcDuration.getSeconds());
 
     if (currentRetention.equals(WORKFLOW_EXECUTION_TTL)) {
-      LOGGER.info("Workflow execution TTL already set for namespace " + DEFAULT_NAMESPACE + ". Remains unchanged as: "
+      LOGGER.info("Workflow execution TTL already set for namespace " + cloudNamespace + ". Remains unchanged as: "
           + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL);
     } else {
       final var newGrpcDuration = com.google.protobuf.Duration.newBuilder().setSeconds(WORKFLOW_EXECUTION_TTL.getSeconds()).build();
       final var humanReadableCurrentRetention = DurationFormatUtils.formatDurationWords(currentRetention.toMillis(), true, true);
       final var namespaceConfig = NamespaceConfig.newBuilder().setWorkflowExecutionRetentionTtl(newGrpcDuration).build();
-      final var updateNamespaceRequest = UpdateNamespaceRequest.newBuilder().setNamespace(DEFAULT_NAMESPACE).setConfig(namespaceConfig).build();
-      LOGGER.info("Workflow execution TTL differs for namespace " + DEFAULT_NAMESPACE + ". Changing from (" + humanReadableCurrentRetention + ") to ("
+      final var updateNamespaceRequest = UpdateNamespaceRequest.newBuilder().setNamespace(cloudNamespace).setConfig(namespaceConfig).build();
+      LOGGER.info("Workflow execution TTL differs for namespace " + cloudNamespace + ". Changing from (" + humanReadableCurrentRetention + ") to ("
           + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL + "). ");
       client.updateNamespace(updateNamespaceRequest);
     }
@@ -214,9 +218,10 @@ public class TemporalUtils {
 
       try {
         temporalService = temporalServiceSupplier.get();
-        temporalStatus = getNamespaces(temporalService).contains("default");
+        temporalStatus = getNamespaces(temporalService).contains(configs.getTemporalCloudNamespace());
       } catch (final Exception e) {
         // Ignore the exception because this likely means that the Temporal service is still initializing.
+        LOGGER.info("PARKER: getNamespaces returned: {}", getNamespaces(temporalService));
         LOGGER.warn("Ignoring exception while trying to request Temporal namespaces:", e);
       }
     }
