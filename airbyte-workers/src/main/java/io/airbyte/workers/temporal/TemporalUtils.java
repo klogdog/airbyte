@@ -41,6 +41,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.slf4j.Logger;
@@ -56,12 +57,16 @@ public class TemporalUtils {
   private static WorkflowServiceStubs createTemporalCloudService() {
     LOGGER.info("PARKER: called createTemporalCloudService");
     try {
+
+      LOGGER.info("PARKER: pure cert: \n{}", configs.getTemporalCloudClientCert());
       final InputStream clientCert = new ByteArrayInputStream(configs.getTemporalCloudClientCert().getBytes(StandardCharsets.UTF_8));
       final InputStream clientKey = new ByteArrayInputStream(configs.getTemporalCloudClientKey().getBytes(StandardCharsets.UTF_8));
+
+      LOGGER.info("PARKER: cert as stream: \n{}", clientCert);
+
       final String targetEndpoint = configs.getTemporalCloudHost();
 
-      LOGGER.info("PARKER: using client cert {}", configs.getTemporalCloudClientCert().getBytes(StandardCharsets.UTF_8));
-      LOGGER.info("PARKER: using client key with length {}", configs.getTemporalCloudClientKey().getBytes(StandardCharsets.UTF_8).length);
+      LOGGER.info("PARKER: cert as IOUtils stream to string: \n{}", IOUtils.toString(clientCert, StandardCharsets.UTF_8));
 
       final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
           .setSslContext(SimpleSslContextBuilder.forPKCS8(clientCert, clientKey).build())

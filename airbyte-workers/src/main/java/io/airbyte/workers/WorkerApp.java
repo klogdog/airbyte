@@ -462,7 +462,7 @@ public class WorkerApp {
         jobTracker).start();
   }
 
-  public static void main(final String[] args) {
+  public static void main(final String[] args) throws InterruptedException {
     try {
       final Configs configs = new EnvConfigs();
 
@@ -482,6 +482,11 @@ public class WorkerApp {
       }
     } catch (final Throwable t) {
       LOGGER.error("Worker app failed", t);
+      var i = 0;
+      while (i < 1000) {
+        Thread.sleep(100000);
+        i += 1;
+      }
       System.exit(1);
     }
   }
