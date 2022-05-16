@@ -72,7 +72,6 @@ import io.airbyte.server.handlers.helpers.CatalogConverter;
 import io.airbyte.validation.json.JsonSchemaValidator;
 import io.airbyte.validation.json.JsonValidationException;
 import io.airbyte.workers.temporal.TemporalClient.ManualOperationResult;
-import io.airbyte.workers.temporal.TemporalUtils;
 import io.temporal.api.common.v1.WorkflowExecution;
 import io.temporal.api.workflowservice.v1.RequestCancelWorkflowExecutionRequest;
 import io.temporal.serviceclient.WorkflowServiceStubs;

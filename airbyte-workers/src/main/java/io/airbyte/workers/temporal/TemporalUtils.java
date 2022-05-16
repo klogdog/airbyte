@@ -28,7 +28,6 @@ import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
 import io.temporal.workflow.Functions;
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
@@ -98,7 +97,7 @@ public class TemporalUtils {
       .setInitialInterval(Duration.ofSeconds(configs.getDelayBetweenActivityAttempts()))
       .build();
 
-//  public static final String DEFAULT_NAMESPACE = "default";
+  // public static final String DEFAULT_NAMESPACE = "default";
 
   private static final Duration WORKFLOW_EXECUTION_TTL = Duration.ofDays(configs.getTemporalRetentionInDays());
   private static final String HUMAN_READABLE_WORKFLOW_EXECUTION_TTL =
@@ -218,6 +217,7 @@ public class TemporalUtils {
 
       try {
         temporalService = temporalServiceSupplier.get();
+        LOGGER.info("PARKER: getNamespaces returned: {}", getNamespaces(temporalService));
         temporalStatus = getNamespaces(temporalService).contains(configs.getTemporalCloudNamespace());
       } catch (final Exception e) {
         // Ignore the exception because this likely means that the Temporal service is still initializing.
