@@ -474,7 +474,7 @@ public class SchedulerHandler {
           .build();
       final RequestCancelWorkflowExecutionRequest cancelRequest = RequestCancelWorkflowExecutionRequest.newBuilder()
           .setWorkflowExecution(workflowExecution)
-          .setNamespace(TemporalUtils.DEFAULT_NAMESPACE)
+          .setNamespace("default") // TODO use temporal cloud namespace
           .build();
       temporalService.blockingStub().requestCancelWorkflowExecution(cancelRequest);
     }
