@@ -53,7 +53,7 @@ public class TemporalUtils {
   public static final Duration SEND_HEARTBEAT_INTERVAL = Duration.ofSeconds(10);
   public static final Duration HEARTBEAT_TIMEOUT = Duration.ofSeconds(30);
 
-  public static WorkflowServiceStubs createTemporalCloudService() {
+  private static WorkflowServiceStubs createTemporalCloudService() {
     LOGGER.info("PARKER: called createTemporalCloudService");
     try {
       final InputStream clientCert = new ByteArrayInputStream(configs.getTemporalCloudClientCert().getBytes(StandardCharsets.UTF_8));
@@ -79,16 +79,18 @@ public class TemporalUtils {
   }
 
   public static WorkflowServiceStubs createTemporalService(final String temporalHost) {
-    LOGGER.info("PARKER: called createTemporalService (unexpected)");
-    final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
-        .setTarget(temporalHost) // todo: move to EnvConfigs
-        .build();
+    return createTemporalCloudService();
 
-    return getTemporalClientWhenConnected(
-        Duration.ofSeconds(2),
-        Duration.ofMinutes(2),
-        Duration.ofSeconds(5),
-        () -> WorkflowServiceStubs.newInstance(options));
+//    LOGGER.info("PARKER: called createTemporalService (unexpected)");
+//    final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
+//        .setTarget(temporalHost) // todo: move to EnvConfigs
+//        .build();
+//
+//    return getTemporalClientWhenConnected(
+//        Duration.ofSeconds(2),
+//        Duration.ofMinutes(2),
+//        Duration.ofSeconds(5),
+//        () -> WorkflowServiceStubs.newInstance(options));
   }
 
   public static final RetryOptions NO_RETRY = RetryOptions.newBuilder().setMaximumAttempts(1).build();
