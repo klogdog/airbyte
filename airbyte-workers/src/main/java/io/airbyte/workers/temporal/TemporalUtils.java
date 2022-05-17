@@ -12,12 +12,10 @@ import io.airbyte.config.EnvConfigs;
 import io.airbyte.scheduler.models.JobRunConfig;
 import io.temporal.activity.ActivityExecutionContext;
 import io.temporal.api.common.v1.WorkflowExecution;
-import io.temporal.api.namespace.v1.NamespaceConfig;
 import io.temporal.api.namespace.v1.NamespaceInfo;
 import io.temporal.api.workflowservice.v1.DescribeNamespaceRequest;
 import io.temporal.api.workflowservice.v1.DescribeNamespaceResponse;
 import io.temporal.api.workflowservice.v1.ListNamespacesRequest;
-import io.temporal.api.workflowservice.v1.UpdateNamespaceRequest;
 import io.temporal.client.ActivityCompletionException;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowOptions;
@@ -27,10 +25,9 @@ import io.temporal.serviceclient.SimpleSslContextBuilder;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.serviceclient.WorkflowServiceStubsOptions;
 import io.temporal.workflow.Functions;
-import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.Serializable;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Set;
 import java.util.UUID;
@@ -41,7 +38,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.slf4j.Logger;
@@ -58,15 +54,15 @@ public class TemporalUtils {
     LOGGER.info("PARKER: called createTemporalCloudService");
     try {
 
-      LOGGER.info("PARKER: pure cert: \n{}", configs.getTemporalCloudClientCert());
-      final InputStream clientCert = new ByteArrayInputStream(configs.getTemporalCloudClientCert().getBytes(StandardCharsets.UTF_8));
-      final InputStream clientKey = new ByteArrayInputStream(configs.getTemporalCloudClientKey().getBytes(StandardCharsets.UTF_8));
+      final InputStream clientCert = new FileInputStream(configs.getTemporalCloudClientCertPath());
+      final InputStream clientKey = new FileInputStream(configs.getTemporalCloudClientKeyPath());
 
-      LOGGER.info("PARKER: cert as stream: \n{}", clientCert);
+      // LOGGER.info("PARKER: cert as stream: \n{}", clientCert);
 
       final String targetEndpoint = configs.getTemporalCloudHost();
 
-      LOGGER.info("PARKER: cert as IOUtils stream to string: \n{}", IOUtils.toString(clientCert, StandardCharsets.UTF_8));
+      // LOGGER.info("PARKER: cert as IOUtils stream to string: \n{}", IOUtils.toString(clientCert,
+      // StandardCharsets.UTF_8));
 
       final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
           .setSslContext(SimpleSslContextBuilder.forPKCS8(clientCert, clientKey).build())
@@ -119,18 +115,25 @@ public class TemporalUtils {
     final var currentRetentionGrpcDuration = client.describeNamespace(describeNamespaceRequest).getConfig().getWorkflowExecutionRetentionTtl();
     final var currentRetention = Duration.ofSeconds(currentRetentionGrpcDuration.getSeconds());
 
-    if (currentRetention.equals(WORKFLOW_EXECUTION_TTL)) {
-      LOGGER.info("Workflow execution TTL already set for namespace " + cloudNamespace + ". Remains unchanged as: "
-          + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL);
-    } else {
-      final var newGrpcDuration = com.google.protobuf.Duration.newBuilder().setSeconds(WORKFLOW_EXECUTION_TTL.getSeconds()).build();
-      final var humanReadableCurrentRetention = DurationFormatUtils.formatDurationWords(currentRetention.toMillis(), true, true);
-      final var namespaceConfig = NamespaceConfig.newBuilder().setWorkflowExecutionRetentionTtl(newGrpcDuration).build();
-      final var updateNamespaceRequest = UpdateNamespaceRequest.newBuilder().setNamespace(cloudNamespace).setConfig(namespaceConfig).build();
-      LOGGER.info("Workflow execution TTL differs for namespace " + cloudNamespace + ". Changing from (" + humanReadableCurrentRetention + ") to ("
-          + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL + "). ");
-      client.updateNamespace(updateNamespaceRequest);
-    }
+    // TODO figure out right way to disable this in cloud (we can't change their TTL)
+    // if (currentRetention.equals(WORKFLOW_EXECUTION_TTL)) {
+    // LOGGER.info("Workflow execution TTL already set for namespace " + cloudNamespace + ". Remains
+    // unchanged as: "
+    // + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL);
+    // } else {
+    // final var newGrpcDuration =
+    // com.google.protobuf.Duration.newBuilder().setSeconds(WORKFLOW_EXECUTION_TTL.getSeconds()).build();
+    // final var humanReadableCurrentRetention =
+    // DurationFormatUtils.formatDurationWords(currentRetention.toMillis(), true, true);
+    // final var namespaceConfig =
+    // NamespaceConfig.newBuilder().setWorkflowExecutionRetentionTtl(newGrpcDuration).build();
+    // final var updateNamespaceRequest =
+    // UpdateNamespaceRequest.newBuilder().setNamespace(cloudNamespace).setConfig(namespaceConfig).build();
+    // LOGGER.info("Workflow execution TTL differs for namespace " + cloudNamespace + ". Changing from
+    // (" + humanReadableCurrentRetention + ") to ("
+    // + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL + "). ");
+    // client.updateNamespace(updateNamespaceRequest);
+    // }
   }
 
   @FunctionalInterface
@@ -226,11 +229,11 @@ public class TemporalUtils {
 
       try {
         temporalService = temporalServiceSupplier.get();
-        LOGGER.info("PARKER: getNamespaces returned: {}", getNamespaces(temporalService));
-        temporalStatus = getNamespaces(temporalService).contains(configs.getTemporalCloudNamespace());
+        final var cloudNamespaceInfo = getCloudNamespaceInfo(temporalService);
+        LOGGER.info("PARKER: cloudNamespaceInfo: {}", cloudNamespaceInfo);
+        temporalStatus = cloudNamespaceInfo.isInitialized();
       } catch (final Exception e) {
         // Ignore the exception because this likely means that the Temporal service is still initializing.
-        LOGGER.info("PARKER: getNamespaces returned: {}", getNamespaces(temporalService));
         LOGGER.warn("Ignoring exception while trying to request Temporal namespaces:", e);
       }
     }
@@ -238,9 +241,15 @@ public class TemporalUtils {
     // sometimes it takes a few additional seconds for workflow queue listening to be available
     Exceptions.toRuntime(() -> Thread.sleep(waitAfterConnection.toMillis()));
 
-    LOGGER.info("Found temporal default namespace!");
+    LOGGER.info("Temporal Cloud connection initialized!");
 
     return temporalService;
+  }
+
+  protected static NamespaceInfo getCloudNamespaceInfo(final WorkflowServiceStubs temporalService) {
+    return temporalService.blockingStub()
+        .describeNamespace(DescribeNamespaceRequest.newBuilder().setNamespace(configs.getTemporalCloudNamespace()).build())
+        .getNamespaceInfo();
   }
 
   protected static Set<String> getNamespaces(final WorkflowServiceStubs temporalService) {

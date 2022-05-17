@@ -168,17 +168,6 @@ spec:
             configMapKeyRef:
               name: {{ include "common.names.fullname" . }}-env
               key: S3_LOG_BUCKET_REGION
-        # TODO template the temporal cloud secrets w/ proper secret names and keys
-        - name: TEMPORAL_CLOUD_CLIENT_CERT
-          valueFrom:
-            secretKeyRef:
-              name: temporal-cloud-cert
-              key: cert.txt
-        - name: TEMPORAL_CLOUD_CLIENT_KEY
-            valueFrom:
-              secretKeyRef:
-                name: temporal-cloud-key
-                key: key.txt
         {{- if and .Values.logs.accessKey.existingSecret .Values.logs.accessKey.existingSecretKey }}
         - name: AWS_ACCESS_KEY_ID
           valueFrom:

@@ -187,13 +187,12 @@ public interface Configs {
   /**
    * Temporal Cloud client cert for SSL
    */
-  String getTemporalCloudClientCert();
+  String getTemporalCloudClientCertPath();
 
   /**
    * Temporal Cloud client key for SSL
-   *
    */
-  String getTemporalCloudClientKey();
+  String getTemporalCloudClientKeyPath();
 
   // Airbyte Services
 

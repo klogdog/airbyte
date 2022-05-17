@@ -82,8 +82,8 @@ public class EnvConfigs implements Configs {
   private static final String TEMPORAL_HISTORY_RETENTION_IN_DAYS = "TEMPORAL_HISTORY_RETENTION_IN_DAYS";
   private static final String TEMPORAL_CLOUD_HOST = "TEMPORAL_CLOUD_HOST";
   private static final String TEMPORAL_CLOUD_NAMESPACE = "TEMPORAL_CLOUD_NAMESPACE";
-  private static final String TEMPORAL_CLOUD_CLIENT_CERT = "TEMPORAL_CLOUD_CLIENT_CERT";
-  private static final String TEMPORAL_CLOUD_CLIENT_KEY = "TEMPORAL_CLOUD_CLIENT_KEY";
+  private static final String TEMPORAL_CLOUD_CERT_PATH = "TEMPORAL_CLOUD_CERT_PATH";
+  private static final String TEMPORAL_CLOUD_KEY_PATH = "TEMPORAL_CLOUD_KEY_PATH";
   public static final String JOB_KUBE_NAMESPACE = "JOB_KUBE_NAMESPACE";
   private static final String SUBMITTER_NUM_THREADS = "SUBMITTER_NUM_THREADS";
   public static final String JOB_MAIN_CONTAINER_CPU_REQUEST = "JOB_MAIN_CONTAINER_CPU_REQUEST";
@@ -407,13 +407,13 @@ public class EnvConfigs implements Configs {
   }
 
   @Override
-  public String getTemporalCloudClientCert() {
-    return getEnsureEnv(TEMPORAL_CLOUD_CLIENT_CERT);
+  public String getTemporalCloudClientCertPath() {
+    return getEnsureEnv(TEMPORAL_CLOUD_CERT_PATH);
   }
 
   @Override
-  public String getTemporalCloudClientKey() {
-    return getEnsureEnv(TEMPORAL_CLOUD_CLIENT_KEY);
+  public String getTemporalCloudClientKeyPath() {
+    return getEnsureEnv(TEMPORAL_CLOUD_KEY_PATH);
   }
 
   // Airbyte Services
