@@ -31,6 +31,7 @@ import io.airbyte.workers.temporal.sync.SyncWorkflow;
 import io.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsRequest;
 import io.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse;
 import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowClientOptions;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import java.nio.file.Path;
 import java.util.HashSet;
@@ -71,7 +72,8 @@ public class TemporalClient {
 
   public static TemporalClient production(final String temporalHost, final Path workspaceRoot, final Configs configs) {
     final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalService(temporalHost);
-    return new TemporalClient(WorkflowClient.newInstance(temporalService), workspaceRoot,
+    final WorkflowClientOptions workflowOptions = WorkflowClientOptions.newBuilder().setNamespace(configs.getTemporalCloudNamespace()).build();
+    return new TemporalClient(WorkflowClient.newInstance(temporalService, workflowOptions), workspaceRoot,
         temporalService, configs);
     // LOGGER.info("PARKER: called TemporalClient production");
     // LOGGER.info("PARKER: returning cloud client");
