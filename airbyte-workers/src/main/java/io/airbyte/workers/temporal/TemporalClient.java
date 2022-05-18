@@ -59,44 +59,50 @@ public class TemporalClient {
   private final Path workspaceRoot;
   private final WorkflowClient client;
   private final WorkflowServiceStubs service;
-  private final Configs configs;
 
   /**
-   * This is use to sleep between 2 temporal queries. The query are needed to ensure that the cancel
-   * and start manual sync methods wait before returning. Since temporal signals are async, we need to
-   * use the queries to make sure that we are in a state in which we want to continue with.
+   * This is use to sleep between 2 temporal queries. The query are needed to ensure that the cancel and start manual sync methods wait before
+   * returning. Since temporal signals are async, we need to use the queries to make sure that we are in a state in which we want to continue with.
    */
   private static final int DELAY_BETWEEN_QUERY_MS = 10;
 
-  private static final int MAXIMUM_SEARCH_PAGE_SIZE = 50;
-
-  public static TemporalClient production(final String temporalHost, final Path workspaceRoot, final Configs configs) {
-    final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalService(temporalHost);
-    final WorkflowClientOptions workflowOptions = WorkflowClientOptions.newBuilder().setNamespace(configs.getTemporalCloudNamespace()).build();
-    return new TemporalClient(WorkflowClient.newInstance(temporalService, workflowOptions), workspaceRoot,
-        temporalService, configs);
-    // LOGGER.info("PARKER: called TemporalClient production");
-    // LOGGER.info("PARKER: returning cloud client");
-    // return cloudClient(workspaceRoot, configs);
+  public static TemporalClient production(final Configs configs) {
+    if (configs.temporalCloudEnabled()) {
+      LOGGER.info("TemporalClient.production chose Cloud...");
+      return TemporalClient.cloud(configs.getWorkspaceRoot(), configs);
+    }
+    LOGGER.info("TemporalClient.production chose Airbyte...");
+    return TemporalClient.airbyte(configs.getTemporalHost(), configs.getWorkspaceRoot());
   }
 
-  // public static TemporalClient cloudClient(final Path workspaceRoot, final Configs configs) {
-  // LOGGER.info("PARKER: called TemporalClient cloudClient");
-  // final WorkflowServiceStubs temporalCloudService = TemporalUtils.createTemporalCloudService();
-  // return new TemporalClient(WorkflowClient.newInstance(temporalCloudService), workspaceRoot,
-  // temporalCloudService, configs);
-  // }
+  public static TemporalClient cloud(final Path workspaceRoot, final Configs configs) {
+    LOGGER.info("Using Temporal Cloud with:\nhost: {}\nnamespace: {}", configs.getTemporalCloudHost(), configs.getTemporalCloudNamespace());
+    final WorkflowServiceStubs temporalCloudService = TemporalUtils.createTemporalCloudService();
+    return new TemporalClient(
+        WorkflowClient.newInstance(
+            temporalCloudService,
+            WorkflowClientOptions.newBuilder()
+                .setNamespace(configs.getTemporalCloudNamespace())
+                .build()),
+        workspaceRoot,
+        temporalCloudService);
+  }
+
+  public static TemporalClient airbyte(final String temporalHost, final Path workspaceRoot) {
+    LOGGER.info("Using Temporal Airbyte with:\nhost: {}\nnamespace: {}", temporalHost, TemporalUtils.DEFAULT_NAMESPACE);
+    final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalAirbyteService(temporalHost);
+    return new TemporalClient(WorkflowClient.newInstance(temporalService), workspaceRoot, temporalService);
+  }
 
   // todo (cgardens) - there are two sources of truth on workspace root. we need to get this down to
   // one. either temporal decides and can report it or it is injected into temporal runs.
-  public TemporalClient(final WorkflowClient client,
-                        final Path workspaceRoot,
-                        final WorkflowServiceStubs workflowServiceStubs,
-                        final Configs configs) {
+  @VisibleForTesting
+  protected TemporalClient(final WorkflowClient client,
+      final Path workspaceRoot,
+      final WorkflowServiceStubs workflowServiceStubs) {
     this.client = client;
     this.workspaceRoot = workspaceRoot;
     this.service = workflowServiceStubs;
-    this.configs = configs;
   }
 
   public TemporalResponse<ConnectorSpecification> submitGetSpec(final UUID jobId, final int attempt, final JobGetSpecConfig config) {

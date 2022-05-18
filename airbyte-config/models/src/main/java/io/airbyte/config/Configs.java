@@ -174,6 +174,11 @@ public interface Configs {
   // Temporal Cloud
 
   /**
+   * Define if Temporal Cloud should be used
+   */
+  boolean temporalCloudEnabled();
+
+  /**
    * Temporal Cloud target endpoint, usually with form ${namespace}.tmprl.cloud:7233
    */
   String getTemporalCloudHost();

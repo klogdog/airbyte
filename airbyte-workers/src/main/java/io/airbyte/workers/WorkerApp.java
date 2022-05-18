@@ -381,9 +381,7 @@ public class WorkerApp {
       KubePortManagerSingleton.init(configs.getTemporalWorkerPorts());
     }
 
-    final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalService(temporalHost);
-
-    TemporalUtils.configureTemporalNamespace(temporalService);
+    final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalProductionService();
 
     final Database configDatabase = new ConfigsDatabaseInstance(configsDslContext).getInitialized();
     final FeatureFlags featureFlags = new EnvVariableFeatureFlags();
@@ -410,8 +408,7 @@ public class WorkerApp {
         configRepository,
         new OAuthConfigSupplier(configRepository, trackingClient));
 
-    LOGGER.info("PARKER: about to call TemporalClient production from WorkerApp launchWorkerApp");
-    final TemporalClient temporalClient = TemporalClient.production(temporalHost, workspaceRoot, configs);
+    final TemporalClient temporalClient = TemporalClient.production(configs);
 
     final TemporalWorkerRunFactory temporalWorkerRunFactory = new TemporalWorkerRunFactory(
         temporalClient,

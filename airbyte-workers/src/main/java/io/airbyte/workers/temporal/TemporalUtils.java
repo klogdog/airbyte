@@ -4,18 +4,16 @@
 
 package io.airbyte.workers.temporal;
 
-import static java.util.stream.Collectors.toSet;
-
 import io.airbyte.commons.lang.Exceptions;
 import io.airbyte.config.Configs;
 import io.airbyte.config.EnvConfigs;
 import io.airbyte.scheduler.models.JobRunConfig;
 import io.temporal.activity.ActivityExecutionContext;
 import io.temporal.api.common.v1.WorkflowExecution;
+import io.temporal.api.namespace.v1.NamespaceConfig;
 import io.temporal.api.namespace.v1.NamespaceInfo;
 import io.temporal.api.workflowservice.v1.DescribeNamespaceRequest;
-import io.temporal.api.workflowservice.v1.DescribeNamespaceResponse;
-import io.temporal.api.workflowservice.v1.ListNamespacesRequest;
+import io.temporal.api.workflowservice.v1.UpdateNamespaceRequest;
 import io.temporal.client.ActivityCompletionException;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowOptions;
@@ -29,7 +27,6 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.time.Duration;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -47,93 +44,84 @@ public class TemporalUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TemporalUtils.class);
 
+  private static final Configs configs = new EnvConfigs();
+  private static final Duration WORKFLOW_EXECUTION_TTL = Duration.ofDays(configs.getTemporalRetentionInDays());
+  private static final String HUMAN_READABLE_WORKFLOW_EXECUTION_TTL = DurationFormatUtils.formatDurationWords(WORKFLOW_EXECUTION_TTL.toMillis(), true, true);
+
   public static final Duration SEND_HEARTBEAT_INTERVAL = Duration.ofSeconds(10);
   public static final Duration HEARTBEAT_TIMEOUT = Duration.ofSeconds(30);
+  public static final RetryOptions NO_RETRY = RetryOptions.newBuilder().setMaximumAttempts(1).build();
+  public static final RetryOptions RETRY = RetryOptions.newBuilder()
+      .setMaximumAttempts(configs.getActivityNumberOfAttempt())
+      .setInitialInterval(Duration.ofSeconds(configs.getDelayBetweenActivityAttempts()))
+      .build();
+  public static final String DEFAULT_NAMESPACE = "default";
 
-  private static WorkflowServiceStubs createTemporalCloudService() {
-    LOGGER.info("PARKER: called createTemporalCloudService");
+  public static WorkflowServiceStubs createTemporalProductionService() {
+    if (configs.temporalCloudEnabled()) {
+      return createTemporalCloudService();
+    }
+    final WorkflowServiceStubs temporalService = createTemporalAirbyteService(configs.getTemporalHost());
+    configureTemporalAirbyteNamespace(temporalService);
+    return createTemporalAirbyteService(configs.getTemporalHost());
+  }
+
+  public static WorkflowServiceStubs createTemporalCloudService() {
     try {
-
       final InputStream clientCert = new FileInputStream(configs.getTemporalCloudClientCertPath());
       final InputStream clientKey = new FileInputStream(configs.getTemporalCloudClientKeyPath());
 
-      // LOGGER.info("PARKER: cert as stream: \n{}", clientCert);
-
-      final String targetEndpoint = configs.getTemporalCloudHost();
-
-      // LOGGER.info("PARKER: cert as IOUtils stream to string: \n{}", IOUtils.toString(clientCert,
-      // StandardCharsets.UTF_8));
-
       final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
           .setSslContext(SimpleSslContextBuilder.forPKCS8(clientCert, clientKey).build())
-          .setTarget(targetEndpoint)
+          .setTarget(configs.getTemporalCloudHost())
           .build();
 
       return getTemporalClientWhenConnected(
           Duration.ofSeconds(2),
           Duration.ofMinutes(2),
           Duration.ofSeconds(5),
-          () -> WorkflowServiceStubs.newInstance(options));
+          () -> WorkflowServiceStubs.newInstance(options),
+          configs.getTemporalCloudNamespace());
     } catch (final Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  public static WorkflowServiceStubs createTemporalService(final String temporalHost) {
-    return createTemporalCloudService();
+  public static WorkflowServiceStubs createTemporalAirbyteService(final String temporalHost) {
+    final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
+        .setTarget(temporalHost) // todo: move to EnvConfigs
+        .build();
 
-    // LOGGER.info("PARKER: called createTemporalService (unexpected)");
-    // final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
-    // .setTarget(temporalHost) // todo: move to EnvConfigs
-    // .build();
-    //
-    // return getTemporalClientWhenConnected(
-    // Duration.ofSeconds(2),
-    // Duration.ofMinutes(2),
-    // Duration.ofSeconds(5),
-    // () -> WorkflowServiceStubs.newInstance(options));
+    final WorkflowServiceStubs temporalService = getTemporalClientWhenConnected(
+        Duration.ofSeconds(2),
+        Duration.ofMinutes(2),
+        Duration.ofSeconds(5),
+        () -> WorkflowServiceStubs.newInstance(options),
+        DEFAULT_NAMESPACE);
+
+    configureTemporalAirbyteNamespace(temporalService);
+
+    return temporalService;
   }
 
-  public static final RetryOptions NO_RETRY = RetryOptions.newBuilder().setMaximumAttempts(1).build();
-
-  private static final Configs configs = new EnvConfigs();
-  public static final RetryOptions RETRY = RetryOptions.newBuilder()
-      .setMaximumAttempts(configs.getActivityNumberOfAttempt())
-      .setInitialInterval(Duration.ofSeconds(configs.getDelayBetweenActivityAttempts()))
-      .build();
-
-  // public static final String DEFAULT_NAMESPACE = "default";
-
-  private static final Duration WORKFLOW_EXECUTION_TTL = Duration.ofDays(configs.getTemporalRetentionInDays());
-  private static final String HUMAN_READABLE_WORKFLOW_EXECUTION_TTL =
-      DurationFormatUtils.formatDurationWords(WORKFLOW_EXECUTION_TTL.toMillis(), true, true);
-
-  public static void configureTemporalNamespace(final WorkflowServiceStubs temporalService) {
-    final var cloudNamespace = configs.getTemporalCloudNamespace();
+  private static void configureTemporalAirbyteNamespace(final WorkflowServiceStubs temporalService) {
     final var client = temporalService.blockingStub();
-    final var describeNamespaceRequest = DescribeNamespaceRequest.newBuilder().setNamespace(cloudNamespace).build();
+    final var describeNamespaceRequest = DescribeNamespaceRequest.newBuilder().setNamespace(DEFAULT_NAMESPACE).build();
     final var currentRetentionGrpcDuration = client.describeNamespace(describeNamespaceRequest).getConfig().getWorkflowExecutionRetentionTtl();
     final var currentRetention = Duration.ofSeconds(currentRetentionGrpcDuration.getSeconds());
 
-    // TODO figure out right way to disable this in cloud (we can't change their TTL)
-    // if (currentRetention.equals(WORKFLOW_EXECUTION_TTL)) {
-    // LOGGER.info("Workflow execution TTL already set for namespace " + cloudNamespace + ". Remains
-    // unchanged as: "
-    // + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL);
-    // } else {
-    // final var newGrpcDuration =
-    // com.google.protobuf.Duration.newBuilder().setSeconds(WORKFLOW_EXECUTION_TTL.getSeconds()).build();
-    // final var humanReadableCurrentRetention =
-    // DurationFormatUtils.formatDurationWords(currentRetention.toMillis(), true, true);
-    // final var namespaceConfig =
-    // NamespaceConfig.newBuilder().setWorkflowExecutionRetentionTtl(newGrpcDuration).build();
-    // final var updateNamespaceRequest =
-    // UpdateNamespaceRequest.newBuilder().setNamespace(cloudNamespace).setConfig(namespaceConfig).build();
-    // LOGGER.info("Workflow execution TTL differs for namespace " + cloudNamespace + ". Changing from
-    // (" + humanReadableCurrentRetention + ") to ("
-    // + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL + "). ");
-    // client.updateNamespace(updateNamespaceRequest);
-    // }
+    if (currentRetention.equals(WORKFLOW_EXECUTION_TTL)) {
+      LOGGER.info("Workflow execution TTL already set for namespace " + DEFAULT_NAMESPACE + ". Remains unchanged as: "
+          + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL);
+    } else {
+      final var newGrpcDuration = com.google.protobuf.Duration.newBuilder().setSeconds(WORKFLOW_EXECUTION_TTL.getSeconds()).build();
+      final var humanReadableCurrentRetention = DurationFormatUtils.formatDurationWords(currentRetention.toMillis(), true, true);
+      final var namespaceConfig = NamespaceConfig.newBuilder().setWorkflowExecutionRetentionTtl(newGrpcDuration).build();
+      final var updateNamespaceRequest = UpdateNamespaceRequest.newBuilder().setNamespace(DEFAULT_NAMESPACE).setConfig(namespaceConfig).build();
+      LOGGER.info("Workflow execution TTL differs for namespace " + DEFAULT_NAMESPACE + ". Changing from (" + humanReadableCurrentRetention + ") to ("
+          + HUMAN_READABLE_WORKFLOW_EXECUTION_TTL + "). ");
+      client.updateNamespace(updateNamespaceRequest);
+    }
   }
 
   @FunctionalInterface
@@ -211,7 +199,8 @@ public class TemporalUtils {
                                                                     final Duration waitInterval,
                                                                     final Duration maxTimeToConnect,
                                                                     final Duration waitAfterConnection,
-                                                                    final Supplier<WorkflowServiceStubs> temporalServiceSupplier) {
+                                                                    final Supplier<WorkflowServiceStubs> temporalServiceSupplier,
+                                                                    final String namespace) {
     LOGGER.info("Waiting for temporal server...");
 
     boolean temporalStatus = false;
@@ -223,43 +212,32 @@ public class TemporalUtils {
         throw new RuntimeException("Could not create Temporal client within max timeout!");
       }
 
-      LOGGER.warn("Waiting for default namespace to be initialized in temporal...");
+      LOGGER.warn("Waiting for namespace {} to be initialized in temporal...", namespace);
       Exceptions.toRuntime(() -> Thread.sleep(waitInterval.toMillis()));
       millisWaited = millisWaited + waitInterval.toMillis();
 
       try {
         temporalService = temporalServiceSupplier.get();
-        final var cloudNamespaceInfo = getCloudNamespaceInfo(temporalService);
-        LOGGER.info("PARKER: cloudNamespaceInfo: {}", cloudNamespaceInfo);
-        temporalStatus = cloudNamespaceInfo.isInitialized();
+        final var namespaceInfo = getNamespaceInfo(temporalService, namespace);
+        temporalStatus = namespaceInfo.isInitialized();
       } catch (final Exception e) {
         // Ignore the exception because this likely means that the Temporal service is still initializing.
-        LOGGER.warn("Ignoring exception while trying to request Temporal namespaces:", e);
+        LOGGER.warn("Ignoring exception while trying to request Temporal namespace:", e);
       }
     }
 
     // sometimes it takes a few additional seconds for workflow queue listening to be available
     Exceptions.toRuntime(() -> Thread.sleep(waitAfterConnection.toMillis()));
 
-    LOGGER.info("Temporal Cloud connection initialized!");
+    LOGGER.info("Temporal namespace {} initialized!", namespace);
 
     return temporalService;
   }
 
-  protected static NamespaceInfo getCloudNamespaceInfo(final WorkflowServiceStubs temporalService) {
+  protected static NamespaceInfo getNamespaceInfo(final WorkflowServiceStubs temporalService, final String namespace) {
     return temporalService.blockingStub()
-        .describeNamespace(DescribeNamespaceRequest.newBuilder().setNamespace(configs.getTemporalCloudNamespace()).build())
+        .describeNamespace(DescribeNamespaceRequest.newBuilder().setNamespace(namespace).build())
         .getNamespaceInfo();
-  }
-
-  protected static Set<String> getNamespaces(final WorkflowServiceStubs temporalService) {
-    return temporalService.blockingStub()
-        .listNamespaces(ListNamespacesRequest.newBuilder().build())
-        .getNamespacesList()
-        .stream()
-        .map(DescribeNamespaceResponse::getNamespaceInfo)
-        .map(NamespaceInfo::getName)
-        .collect(toSet());
   }
 
   /**
