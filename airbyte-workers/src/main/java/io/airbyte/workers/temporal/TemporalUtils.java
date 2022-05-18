@@ -4,6 +4,7 @@
 
 package io.airbyte.workers.temporal;
 
+import com.google.common.annotations.VisibleForTesting;
 import io.airbyte.commons.lang.Exceptions;
 import io.airbyte.config.Configs;
 import io.airbyte.config.EnvConfigs;
@@ -46,7 +47,8 @@ public class TemporalUtils {
 
   private static final Configs configs = new EnvConfigs();
   private static final Duration WORKFLOW_EXECUTION_TTL = Duration.ofDays(configs.getTemporalRetentionInDays());
-  private static final String HUMAN_READABLE_WORKFLOW_EXECUTION_TTL = DurationFormatUtils.formatDurationWords(WORKFLOW_EXECUTION_TTL.toMillis(), true, true);
+  private static final String HUMAN_READABLE_WORKFLOW_EXECUTION_TTL =
+      DurationFormatUtils.formatDurationWords(WORKFLOW_EXECUTION_TTL.toMillis(), true, true);
 
   public static final Duration SEND_HEARTBEAT_INTERVAL = Duration.ofSeconds(10);
   public static final Duration HEARTBEAT_TIMEOUT = Duration.ofSeconds(30);
@@ -61,9 +63,9 @@ public class TemporalUtils {
     if (configs.temporalCloudEnabled()) {
       return createTemporalCloudService();
     }
-    final WorkflowServiceStubs temporalService = createTemporalAirbyteService(configs.getTemporalHost());
+    final WorkflowServiceStubs temporalService = createTemporalAirbyteService();
     configureTemporalAirbyteNamespace(temporalService);
-    return createTemporalAirbyteService(configs.getTemporalHost());
+    return temporalService;
   }
 
   public static WorkflowServiceStubs createTemporalCloudService() {
@@ -87,9 +89,15 @@ public class TemporalUtils {
     }
   }
 
+  public static WorkflowServiceStubs createTemporalAirbyteService() {
+    return createTemporalAirbyteService(configs.getTemporalHost());
+  }
+
+  // Only public so that acceptance tests can set a temporal localhost directly
+  @VisibleForTesting
   public static WorkflowServiceStubs createTemporalAirbyteService(final String temporalHost) {
     final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
-        .setTarget(temporalHost) // todo: move to EnvConfigs
+        .setTarget(temporalHost)
         .build();
 
     final WorkflowServiceStubs temporalService = getTemporalClientWhenConnected(

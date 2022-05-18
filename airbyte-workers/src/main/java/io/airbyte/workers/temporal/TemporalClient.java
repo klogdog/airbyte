@@ -61,21 +61,22 @@ public class TemporalClient {
   private final WorkflowServiceStubs service;
 
   /**
-   * This is use to sleep between 2 temporal queries. The query are needed to ensure that the cancel and start manual sync methods wait before
-   * returning. Since temporal signals are async, we need to use the queries to make sure that we are in a state in which we want to continue with.
+   * This is use to sleep between 2 temporal queries. The query are needed to ensure that the cancel
+   * and start manual sync methods wait before returning. Since temporal signals are async, we need to
+   * use the queries to make sure that we are in a state in which we want to continue with.
    */
   private static final int DELAY_BETWEEN_QUERY_MS = 10;
 
   public static TemporalClient production(final Configs configs) {
     if (configs.temporalCloudEnabled()) {
       LOGGER.info("TemporalClient.production chose Cloud...");
-      return TemporalClient.cloud(configs.getWorkspaceRoot(), configs);
+      return TemporalClient.cloud(configs);
     }
     LOGGER.info("TemporalClient.production chose Airbyte...");
-    return TemporalClient.airbyte(configs.getTemporalHost(), configs.getWorkspaceRoot());
+    return TemporalClient.airbyte(configs);
   }
 
-  public static TemporalClient cloud(final Path workspaceRoot, final Configs configs) {
+  public static TemporalClient cloud(final Configs configs) {
     LOGGER.info("Using Temporal Cloud with:\nhost: {}\nnamespace: {}", configs.getTemporalCloudHost(), configs.getTemporalCloudNamespace());
     final WorkflowServiceStubs temporalCloudService = TemporalUtils.createTemporalCloudService();
     return new TemporalClient(
@@ -84,22 +85,23 @@ public class TemporalClient {
             WorkflowClientOptions.newBuilder()
                 .setNamespace(configs.getTemporalCloudNamespace())
                 .build()),
-        workspaceRoot,
+        configs.getWorkspaceRoot(),
         temporalCloudService);
   }
 
-  public static TemporalClient airbyte(final String temporalHost, final Path workspaceRoot) {
+  public static TemporalClient airbyte(final Configs configs) {
+    final String temporalHost = configs.getTemporalHost();
     LOGGER.info("Using Temporal Airbyte with:\nhost: {}\nnamespace: {}", temporalHost, TemporalUtils.DEFAULT_NAMESPACE);
     final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalAirbyteService(temporalHost);
-    return new TemporalClient(WorkflowClient.newInstance(temporalService), workspaceRoot, temporalService);
+    return new TemporalClient(WorkflowClient.newInstance(temporalService), configs.getWorkspaceRoot(), temporalService);
   }
 
   // todo (cgardens) - there are two sources of truth on workspace root. we need to get this down to
   // one. either temporal decides and can report it or it is injected into temporal runs.
   @VisibleForTesting
   protected TemporalClient(final WorkflowClient client,
-      final Path workspaceRoot,
-      final WorkflowServiceStubs workflowServiceStubs) {
+                           final Path workspaceRoot,
+                           final WorkflowServiceStubs workflowServiceStubs) {
     this.client = client;
     this.workspaceRoot = workspaceRoot;
     this.service = workflowServiceStubs;
@@ -202,6 +204,11 @@ public class TemporalClient {
     globalMigrationWatch.stop();
 
     log.info("The migration to the new scheduler took: " + globalMigrationWatch.formatTime());
+  }
+
+  public Set<String> getAllOpenWorkflows() {
+    refreshRunningWorkflow();
+    return workflowNames;
   }
 
   private final Set<String> workflowNames = new HashSet<>();
