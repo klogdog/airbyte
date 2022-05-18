@@ -143,8 +143,7 @@ public class WorkerApp {
           }
         });
 
-    final WorkerFactory factory = WorkerFactory.newInstance(
-        WorkflowClient.newInstance(temporalService, WorkflowClientOptions.newBuilder().setNamespace(configs.getTemporalCloudNamespace()).build()));
+    final WorkerFactory factory = TemporalClient.productionWorkerFactory(configs);
 
     if (configs.shouldRunGetSpecWorkflows()) {
       registerGetSpec(factory);
@@ -371,9 +370,6 @@ public class WorkerApp {
 
     final Path workspaceRoot = configs.getWorkspaceRoot();
     LOGGER.info("workspaceRoot = " + workspaceRoot);
-
-    final String temporalHost = configs.getTemporalHost();
-    LOGGER.info("temporalHost = " + temporalHost);
 
     final SecretsHydrator secretsHydrator = SecretPersistence.getSecretsHydrator(configsDslContext, configs);
 

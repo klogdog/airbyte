@@ -33,6 +33,7 @@ import io.temporal.api.workflowservice.v1.ListOpenWorkflowExecutionsResponse;
 import io.temporal.client.WorkflowClient;
 import io.temporal.client.WorkflowClientOptions;
 import io.temporal.serviceclient.WorkflowServiceStubs;
+import io.temporal.worker.WorkerFactory;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Optional;
@@ -76,6 +77,15 @@ public class TemporalClient {
     return TemporalClient.airbyte(configs);
   }
 
+  public static WorkerFactory productionWorkerFactory(final Configs configs) {
+    if (configs.temporalCloudEnabled()) {
+      LOGGER.info("TemporalClient.productionWorkerFactory chose Cloud...");
+      return WorkerFactory.newInstance(cloudWorkflowClient(TemporalUtils.createTemporalCloudService(), configs));
+    }
+    LOGGER.info("TemporalClient.productionWorkerFactory chose Airbyte...");
+    return WorkerFactory.newInstance(airbyteWorkflowClient(TemporalUtils.createTemporalAirbyteService()));
+  }
+
   public static TemporalClient cloud(final Configs configs) {
     LOGGER.info("Using Temporal Cloud with:\nhost: {}\nnamespace: {}", configs.getTemporalCloudHost(), configs.getTemporalCloudNamespace());
     final WorkflowServiceStubs temporalCloudService = TemporalUtils.createTemporalCloudService();
@@ -94,6 +104,18 @@ public class TemporalClient {
     LOGGER.info("Using Temporal Airbyte with:\nhost: {}\nnamespace: {}", temporalHost, TemporalUtils.DEFAULT_NAMESPACE);
     final WorkflowServiceStubs temporalService = TemporalUtils.createTemporalAirbyteService(temporalHost);
     return new TemporalClient(WorkflowClient.newInstance(temporalService), configs.getWorkspaceRoot(), temporalService);
+  }
+
+  private static WorkflowClient cloudWorkflowClient(final WorkflowServiceStubs temporalService, final Configs configs) {
+    return WorkflowClient.newInstance(
+        temporalService,
+        WorkflowClientOptions.newBuilder()
+            .setNamespace(configs.getTemporalCloudNamespace())
+            .build());
+  }
+
+  private static WorkflowClient airbyteWorkflowClient(final WorkflowServiceStubs temporalService) {
+    return WorkflowClient.newInstance(temporalService);
   }
 
   // todo (cgardens) - there are two sources of truth on workspace root. we need to get this down to

@@ -61,8 +61,10 @@ public class TemporalUtils {
 
   public static WorkflowServiceStubs createTemporalProductionService() {
     if (configs.temporalCloudEnabled()) {
+      LOGGER.info("createTemporalProductionService chose Cloud...");
       return createTemporalCloudService();
     }
+    LOGGER.info("createTemporalProductionService chose Airbyte...");
     final WorkflowServiceStubs temporalService = createTemporalAirbyteService();
     configureTemporalAirbyteNamespace(temporalService);
     return temporalService;
