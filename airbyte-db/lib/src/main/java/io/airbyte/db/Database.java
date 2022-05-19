@@ -23,8 +23,7 @@ public class Database {
 
   private static final long DEFAULT_WAIT_MS = 5 * 1000;
 
-  // TODO parker: change back to private
-  public final DSLContext dslContext;
+  private final DSLContext dslContext;
 
   public Database(final DSLContext dslContext) {
     this.dslContext = dslContext;

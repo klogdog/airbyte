@@ -12,8 +12,7 @@ import java.sql.SQLException;
  */
 public class ExceptionWrappingDatabase {
 
-  // TODO parker: change back to private
-  public final Database database;
+  private final Database database;
 
   public ExceptionWrappingDatabase(final Database database) {
     this.database = database;
