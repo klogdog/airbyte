@@ -4,7 +4,6 @@
 
 package io.airbyte.workers.temporal;
 
-import com.google.common.annotations.VisibleForTesting;
 import io.airbyte.commons.lang.Exceptions;
 import io.airbyte.config.Configs;
 import io.airbyte.config.EnvConfigs;
@@ -59,6 +58,14 @@ public class TemporalUtils {
       .build();
   public static final String DEFAULT_NAMESPACE = "default";
 
+  public static TemporalClient cloudClient() {
+    return TemporalClient.cloud(configs);
+  }
+
+  public static TemporalClient airbyteClient() {
+    return TemporalClient.airbyte(configs);
+  }
+
   public static WorkflowServiceStubs createTemporalProductionService() {
     if (configs.temporalCloudEnabled()) {
       LOGGER.info("createTemporalProductionService chose Cloud...");
@@ -71,13 +78,26 @@ public class TemporalUtils {
   }
 
   public static WorkflowServiceStubs createTemporalCloudService() {
+    return createTemporalCloudService(
+        configs.getTemporalCloudClientCertPath(),
+        configs.getTemporalCloudClientKeyPath(),
+        configs.getTemporalHost(),
+        configs.getTemporalCloudNamespace());
+  }
+
+  public static WorkflowServiceStubs createTemporalCloudService(
+      final String temporalCloudClientCertPath,
+      final String temporalCloudClientKeyPath,
+      final String temporalHost,
+      final String temporalNamespace
+  ) {
     try {
-      final InputStream clientCert = new FileInputStream(configs.getTemporalCloudClientCertPath());
-      final InputStream clientKey = new FileInputStream(configs.getTemporalCloudClientKeyPath());
+      final InputStream clientCert = new FileInputStream(temporalCloudClientCertPath);
+      final InputStream clientKey = new FileInputStream(temporalCloudClientKeyPath);
 
       final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
           .setSslContext(SimpleSslContextBuilder.forPKCS8(clientCert, clientKey).build())
-          .setTarget(configs.getTemporalCloudHost())
+          .setTarget(temporalHost)
           .build();
 
       return getTemporalClientWhenConnected(
@@ -85,7 +105,7 @@ public class TemporalUtils {
           Duration.ofMinutes(2),
           Duration.ofSeconds(5),
           () -> WorkflowServiceStubs.newInstance(options),
-          configs.getTemporalCloudNamespace());
+          temporalNamespace);
     } catch (final Exception e) {
       throw new RuntimeException(e);
     }
@@ -95,8 +115,6 @@ public class TemporalUtils {
     return createTemporalAirbyteService(configs.getTemporalHost());
   }
 
-  // Only public so that acceptance tests can set a temporal localhost directly
-  @VisibleForTesting
   public static WorkflowServiceStubs createTemporalAirbyteService(final String temporalHost) {
     final WorkflowServiceStubsOptions options = WorkflowServiceStubsOptions.newBuilder()
         .setTarget(temporalHost)
@@ -173,26 +191,24 @@ public class TemporalUtils {
   }
 
   /**
-   * Allows running a given temporal workflow stub asynchronously. This method only works for
-   * workflows that take one argument. Because of the iface that Temporal supplies, in order to handle
-   * other method signatures, if we need to support them, we will need to add another helper with that
-   * number of args. For a reference on how Temporal recommends to do this see their docs:
-   * https://docs.temporal.io/docs/java/workflows#asynchronous-start
+   * Allows running a given temporal workflow stub asynchronously. This method only works for workflows that take one argument. Because of the iface
+   * that Temporal supplies, in order to handle other method signatures, if we need to support them, we will need to add another helper with that
+   * number of args. For a reference on how Temporal recommends to do this see their docs: https://docs.temporal.io/docs/java/workflows#asynchronous-start
    *
    * @param workflowStub - workflow stub to be executed
-   * @param function - function on the workflow stub to be executed
-   * @param arg1 - argument to be supplied to the workflow function
-   * @param outputType - class of the output type of the workflow function
-   * @param <STUB> - type of the workflow stub
-   * @param <A1> - type of the argument of the workflow stub
-   * @param <R> - type of the return of the workflow stub
-   * @return pair of the workflow execution (contains metadata on the asynchronously running job) and
-   *         future that can be used to await the result of the workflow stub's function
+   * @param function     - function on the workflow stub to be executed
+   * @param arg1         - argument to be supplied to the workflow function
+   * @param outputType   - class of the output type of the workflow function
+   * @param <STUB>       - type of the workflow stub
+   * @param <A1>         - type of the argument of the workflow stub
+   * @param <R>          - type of the return of the workflow stub
+   * @return pair of the workflow execution (contains metadata on the asynchronously running job) and future that can be used to await the result of
+   * the workflow stub's function
    */
   public static <STUB, A1, R> ImmutablePair<WorkflowExecution, CompletableFuture<R>> asyncExecute(final STUB workflowStub,
-                                                                                                  final Functions.Func1<A1, R> function,
-                                                                                                  final A1 arg1,
-                                                                                                  final Class<R> outputType) {
+      final Functions.Func1<A1, R> function,
+      final A1 arg1,
+      final Class<R> outputType) {
     final WorkflowStub untyped = WorkflowStub.fromTyped(workflowStub);
     final WorkflowExecution workflowExecution = WorkflowClient.start(function, arg1);
     final CompletableFuture<R> resultAsync = untyped.getResultAsync(outputType);
@@ -201,16 +217,15 @@ public class TemporalUtils {
 
   /**
    * Loops and waits for the Temporal service to become available and returns a client.
-   *
-   * This function uses a supplier as input since the creation of a WorkflowServiceStubs can result in
-   * connection exceptions as well.
+   * <p>
+   * This function uses a supplier as input since the creation of a WorkflowServiceStubs can result in connection exceptions as well.
    */
   public static WorkflowServiceStubs getTemporalClientWhenConnected(
-                                                                    final Duration waitInterval,
-                                                                    final Duration maxTimeToConnect,
-                                                                    final Duration waitAfterConnection,
-                                                                    final Supplier<WorkflowServiceStubs> temporalServiceSupplier,
-                                                                    final String namespace) {
+      final Duration waitInterval,
+      final Duration maxTimeToConnect,
+      final Duration waitAfterConnection,
+      final Supplier<WorkflowServiceStubs> temporalServiceSupplier,
+      final String namespace) {
     LOGGER.info("Waiting for temporal server...");
 
     boolean temporalStatus = false;
@@ -251,16 +266,16 @@ public class TemporalUtils {
   }
 
   /**
-   * Runs the code within the supplier while heartbeating in the backgroud. Also makes sure to shut
-   * down the heartbeat server after the fact.
+   * Runs the code within the supplier while heartbeating in the backgroud. Also makes sure to shut down the heartbeat server after the fact.
    */
   public static <T> T withBackgroundHeartbeat(final Callable<T> callable,
-                                              final Supplier<ActivityExecutionContext> activityContext) {
+      final Supplier<ActivityExecutionContext> activityContext) {
     final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
 
     try {
       scheduledExecutor.scheduleAtFixedRate(
-          () -> new CancellationHandler.TemporalCancellationHandler(activityContext.get()).checkAndHandleCancellation(() -> {}),
+          () -> new CancellationHandler.TemporalCancellationHandler(activityContext.get()).checkAndHandleCancellation(() -> {
+          }),
           0, SEND_HEARTBEAT_INTERVAL.toSeconds(), TimeUnit.SECONDS);
 
       return callable.call();
@@ -276,8 +291,8 @@ public class TemporalUtils {
   }
 
   public static <T> T withBackgroundHeartbeat(final AtomicReference<Runnable> cancellationCallbackRef,
-                                              final Callable<T> callable,
-                                              final Supplier<ActivityExecutionContext> activityContext) {
+      final Callable<T> callable,
+      final Supplier<ActivityExecutionContext> activityContext) {
     final ScheduledExecutorService scheduledExecutor = Executors.newSingleThreadScheduledExecutor();
 
     try {
