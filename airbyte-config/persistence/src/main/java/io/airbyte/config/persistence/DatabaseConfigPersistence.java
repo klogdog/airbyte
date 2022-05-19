@@ -82,7 +82,6 @@ import org.slf4j.LoggerFactory;
   "PMD.AvoidThrowingRawExceptionTypes", "PMD.ShortVariable", "PMD.LongVariable", "PMD.ExcessiveClassLength", "PMD.AvoidLiteralsInIfCondition"})
 public class DatabaseConfigPersistence implements ConfigPersistence {
 
-
   private final ExceptionWrappingDatabase database;
   private final JsonSecretsProcessor jsonSecretsProcessor;
   private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseConfigPersistence.class);

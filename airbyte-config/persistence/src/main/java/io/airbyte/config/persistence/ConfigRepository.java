@@ -594,9 +594,6 @@ public class ConfigRepository {
 
   public StandardSync getStandardSync(final UUID connectionId) throws JsonValidationException, IOException, ConfigNotFoundException {
     LOGGER.info("PARKER: getStandardSync for connectionId: {}", connectionId);
-    LOGGER.info("PARKER: all connection IDs in db: {}",
-        persistence.listConfigs(ConfigSchema.STANDARD_SYNC, StandardSync.class).stream().map(s -> s.getConnectionId().toString())
-            .collect(Collectors.joining(", ")));
     return persistence.getConfig(ConfigSchema.STANDARD_SYNC, connectionId.toString(), StandardSync.class);
   }
 
