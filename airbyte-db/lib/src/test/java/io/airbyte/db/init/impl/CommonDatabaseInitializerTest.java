@@ -2,7 +2,7 @@
  * Copyright (c) 2021 Airbyte, Inc., all rights reserved.
  */
 
-package io.airbyte.db.check.impl;
+package io.airbyte.db.init.impl;
 
 import io.airbyte.db.factory.DSLContextFactory;
 import io.airbyte.db.factory.DataSourceFactory;
@@ -14,11 +14,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
- * Common test setup for database availability check tests.
+ * Common test setup for database initialization tests.
  */
-public abstract class AbstractDatabaseAvailabilityCheckTest {
-
-  protected static final long TIMEOUT_MS = 500L;
+class CommonDatabaseInitializerTest {
 
   protected PostgreSQLContainer<?> container;
 
@@ -35,6 +33,7 @@ public abstract class AbstractDatabaseAvailabilityCheckTest {
     dslContext = DSLContextFactory.create(dataSource, SQLDialect.POSTGRES);
   }
 
+  @SuppressWarnings("PMD.SignatureDeclareThrowsException")
   @AfterEach
   void cleanup() throws Exception {
     DataSourceFactory.close(dataSource);
